@@ -159,3 +159,71 @@ func TestParseRejectsEmptyAndDuplicateNames(t *testing.T) {
 		})
 	}
 }
+
+func TestGoldenFixtures(t *testing.T) {
+	cases := []struct {
+		file          string
+		tables        int
+		chains, rules []int // per table, in order
+	}{
+		{"docker.save", 2, []int{5, 2}, []int{5, 1}},
+		{"kube-proxy.save", 2, []int{7, 7}, []int{5, 4}},
+		{"ufw.save", 1, []int{5}, []int{4}},
+		{"fail2ban.save", 1, []int{4}, []int{3}},
+		{"firewalld.save", 1, []int{4}, []int{5}},
+		{"ipv6.save", 1, []int{3}, []int{1}},
+		{"empty.save", 0, nil, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.file, func(t *testing.T) {
+			tables := load(t, tc.file)
+			if len(tables) != tc.tables {
+				t.Fatalf("tables = %d, want %d", len(tables), tc.tables)
+			}
+			for i, tb := range tables {
+				if len(tb.Chains) != tc.chains[i] {
+					t.Errorf("table %s chains = %d, want %d", tb.Name, len(tb.Chains), tc.chains[i])
+				}
+				rules := 0
+				for _, c := range tb.Chains {
+					rules += len(c.Rules)
+				}
+				if rules != tc.rules[i] {
+					t.Errorf("table %s rules = %d, want %d", tb.Name, rules, tc.rules[i])
+				}
+			}
+		})
+	}
+}
+
+func TestFixtureDetails(t *testing.T) {
+	fw := load(t, "firewalld.save")[0]
+	if got := chain(t, fw, "INPUT_ZONES").Rules[0].Target; got != "IN_public" {
+		t.Errorf("-g target = %q", got)
+	}
+	f2b := load(t, "fail2ban.save")[0]
+	if got := chain(t, f2b, "f2b-sshd").Rules[0].Target; got != "REJECT" {
+		t.Errorf("REJECT target = %q", got)
+	}
+	ufw := load(t, "ufw.save")[0]
+	if p := chain(t, ufw, "INPUT"); p.Policy != "DROP" || p.Packets != 3 {
+		t.Errorf("ufw INPUT = %+v", p)
+	}
+}
+
+func TestMalformedFixtures(t *testing.T) {
+	for name, want := range map[string]error{"truncated.save": ErrTruncated, "bad-counter.save": nil, "unknown-chain.save": nil} {
+		f, err := os.Open("../../testdata/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, perr := Parse(f)
+		f.Close()
+		if perr == nil {
+			t.Errorf("%s: expected error", name)
+		}
+		if want != nil && !errors.Is(perr, want) {
+			t.Errorf("%s: err = %v, want %v", name, perr, want)
+		}
+	}
+}

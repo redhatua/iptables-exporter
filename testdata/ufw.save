@@ -1,0 +1,11 @@
+*filter
+:INPUT DROP [3:180]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:ufw-before-input - [0:0]
+:ufw-user-input - [0:0]
+[500:40000] -A INPUT -j ufw-before-input
+[500:40000] -A INPUT -j ufw-user-input
+[480:38000] -A ufw-before-input -i lo -j ACCEPT
+[15:900] -A ufw-user-input -p tcp -m tcp --dport 22 -m comment --comment "iptx:id=ufw-ssh" -j ACCEPT
+COMMIT

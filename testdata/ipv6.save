@@ -1,0 +1,6 @@
+*filter
+:INPUT ACCEPT [10:800]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [10:800]
+[4:320] -A INPUT -p ipv6-icmp -m comment --comment "iptx:id=icmp6" -j ACCEPT
+COMMIT
