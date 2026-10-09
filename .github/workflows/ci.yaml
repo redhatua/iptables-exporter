@@ -1,0 +1,74 @@
+name: ci
+on:
+  push: {branches: [main]}
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: {go-version-file: go.mod}
+      - run: make lint
+      - run: make test
+      - name: Fuzz smoke
+        run: go test ./internal/parser/ -run '^$' -fuzz FuzzParse -fuzztime 20s
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The privileged-container test needs the iptables kernel modules of the
+      # hosted runner. This depends on the runner kernel shipping them; it was
+      # validated locally with `make integration` only, not on a hosted runner.
+      - run: sudo modprobe -a iptable_filter ip6table_filter nf_tables || true
+      - run: make integration
+
+  dashboards-and-mixin:
+    runs-on: ubuntu-latest
+    env:
+      PROMETHEUS_VERSION: 3.15.0
+      PROMETHEUS_SHA256: 2a542df32eac02ee17b9d844fb2aa1de00dafa5476579ba8a3ba862e9d572ea0  # from the release sha256sums.txt
+      DASHBOARD_LINTER_VERSION: 0.3.0
+      DASHBOARD_LINTER_SHA256: 9a0eecb84ff22005dbd21c39ffd91534b407b511c45c21879df62ad0de33d79f  # from the release GitHub asset digest (checksums.txt is not signed)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: {go-version-file: go.mod}
+      # jsonnet and jb are pure Go modules and install cleanly with go install.
+      # promtool and dashboard-linter cannot (replace directives in their go.mod),
+      # so they come from the release binaries, verified by SHA256.
+      - name: Install jsonnet and jb
+        run: |
+          go install github.com/google/go-jsonnet/cmd/jsonnet@v0.22.0
+          go install github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@v0.6.0
+      - name: Install promtool and dashboard-linter
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin" "$RUNNER_TEMP/dl"
+          cd "$RUNNER_TEMP/dl"
+          curl -fsSL -o prometheus.tgz "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
+          echo "${PROMETHEUS_SHA256}  prometheus.tgz" | sha256sum -c -
+          tar -xzf prometheus.tgz --strip-components=1 "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
+          install -m 0755 promtool "$HOME/.local/bin/promtool"
+          curl -fsSL -o dashboard-linter.tgz "https://github.com/grafana/dashboard-linter/releases/download/v${DASHBOARD_LINTER_VERSION}/dashboard-linter_${DASHBOARD_LINTER_VERSION}_linux_amd64.tar.gz"
+          echo "${DASHBOARD_LINTER_SHA256}  dashboard-linter.tgz" | sha256sum -c -
+          tar -xzf dashboard-linter.tgz dashboard-linter
+          install -m 0755 dashboard-linter "$HOME/.local/bin/dashboard-linter"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: cd dashboards && jb install
+      - run: make dashboards && git diff --exit-code dashboards/iptables.json
+      - run: dashboard-linter lint --strict dashboards/iptables.json
+      - run: make mixin && git diff --exit-code mixin/alerts.yaml
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - run: helm lint deploy/helm/iptables-exporter
