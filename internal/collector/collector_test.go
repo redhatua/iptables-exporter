@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -184,27 +185,82 @@ func TestDownTargetOmitsCounters(t *testing.T) {
 }
 
 func TestSeriesBudgetOmitsRulesFirstAndDeterministically(t *testing.T) {
-	// docker.save yields 22 policy/inventory series and 2 selected-rule series.
+	// docker.save: prio 1 = 5 built-in chains x 4 series = 20; prio 2 = ssh-in
+	// pair = 2; prio 3 = DOCKER and DOCKER-USER rules gauges = 1 each (24 total).
 	cases := []struct {
 		limit       int
 		wantRules   bool
+		wantDocker  bool
+		wantDUser   bool
 		wantOmitted float64
 	}{
-		{24, true, 0},
-		{23, false, 2}, // a rule pair that does not fit is omitted whole
-		{22, false, 2},
-		{0, true, 0}, // 0 = unlimited
+		{24, true, true, true, 0},
+		{23, true, true, false, 1},
+		{22, true, false, false, 2},
+		{21, false, false, false, 4}, // the rule pair does not fit and stops everything after it
+		{20, false, false, false, 4},
+		{0, true, true, true, 0}, // 0 = unlimited
 	}
 	for _, tc := range cases {
 		got := gather(t, newCollector(t, snapOf(t, true, dockerText(t)), tc.limit))
 		if has := len(got["iptables_rule_packets_total"]) > 0; has != tc.wantRules {
 			t.Errorf("limit=%d rules present=%v want %v", tc.limit, has, tc.wantRules)
 		}
+		_, hasD := find(t, got, "iptables_rules", map[string]string{"chain": "DOCKER"})
+		_, hasU := find(t, got, "iptables_rules", map[string]string{"chain": "DOCKER-USER"})
+		if hasD != tc.wantDocker || hasU != tc.wantDUser {
+			t.Errorf("limit=%d DOCKER=%v DOCKER-USER=%v want %v %v", tc.limit, hasD, hasU, tc.wantDocker, tc.wantDUser)
+		}
+		if _, ok := find(t, got, "iptables_rules", map[string]string{"chain": "INPUT"}); !ok {
+			t.Errorf("limit=%d built-in chains must be kept", tc.limit)
+		}
 		if v, _ := find(t, got, "iptables_series_omitted", nil); v != tc.wantOmitted {
 			t.Errorf("limit=%d omitted=%v want %v", tc.limit, v, tc.wantOmitted)
 		}
 		if len(got["iptables_up"]) == 0 {
 			t.Errorf("limit=%d health metrics must always be present", tc.limit)
+		}
+	}
+}
+
+func TestSelectedRulesSurviveManyUserChains(t *testing.T) {
+	var sb strings.Builder
+	sb.WriteString("*filter\n:INPUT ACCEPT [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [0:0]\n")
+	for i := 0; i < 200; i++ {
+		fmt.Fprintf(&sb, ":USER-%03d - [0:0]\n", i)
+	}
+	sb.WriteString("[1:10] -A INPUT -m comment --comment \"iptx:id=a\" -j ACCEPT\n")
+	sb.WriteString("[2:20] -A INPUT -p tcp -m comment --comment \"iptx:id=b\" -j DROP\n")
+	sb.WriteString("COMMIT\n")
+	got := gather(t, newCollector(t, snapOf(t, true, sb.String()), 50))
+	if n := len(got["iptables_rule_packets_total"]); n != 2 {
+		t.Fatalf("rule series = %d, want 2", n)
+	}
+	// 3 built-in x 4 = 12, rules 4, leaving 34 of 200 user-chain gauges.
+	if n := len(got["iptables_rules"]); n != 3+34 {
+		t.Errorf("rules gauges = %d, want 37", n)
+	}
+	if v, _ := find(t, got, "iptables_series_omitted", nil); v != 166 {
+		t.Errorf("omitted = %v, want 166", v)
+	}
+}
+
+func TestDownTargetWithStaleTablesEmitsNoCounters(t *testing.T) {
+	s := snapOf(t, true, dockerText(t))
+	s.Results[0].Up = false
+	got := gather(t, newCollector(t, s, 5000))
+	id := map[string]string{"family": "ipv4", "backend": "legacy"}
+	if v, ok := find(t, got, "iptables_up", id); !ok || v != 0 {
+		t.Errorf("up = %v ok=%v", v, ok)
+	}
+	for _, name := range []string{"iptables_snapshot_timestamp_seconds", "iptables_backend_info"} {
+		if len(got[name]) != 1 {
+			t.Errorf("%s must be present", name)
+		}
+	}
+	for _, name := range []string{"iptables_rules", "iptables_chain_policy_packets_total", "iptables_chain_policy_bytes_total", "iptables_chain_policy_info", "iptables_rule_packets_total", "iptables_rule_bytes_total"} {
+		if len(got[name]) != 0 {
+			t.Errorf("%s must be absent for a down target", name)
 		}
 	}
 }

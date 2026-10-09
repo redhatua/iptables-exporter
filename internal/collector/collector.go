@@ -68,7 +68,7 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 // group is an indivisible set of series (for example the packets+bytes pair of
 // one rule) ordered by priority then key, so truncation is deterministic.
 type group struct {
-	prio int // 1 = policy/inventory, 2 = selected rules
+	prio int // 1 = built-in chains, 2 = selected rules, 3 = user-defined chains
 	key  string
 	ms   []prometheus.Metric
 }
@@ -99,17 +99,19 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 		for _, tb := range r.Tables {
 			for _, chn := range tb.Chains {
+				prio := 3
 				ms := []prometheus.Metric{
 					prometheus.MustNewConstMetric(descRules, prometheus.GaugeValue, float64(len(chn.Rules)), fam, be, tb.Name, chn.Name),
 				}
 				if chn.Builtin() {
+					prio = 1
 					ms = append(ms,
 						prometheus.MustNewConstMetric(descPolicyPackets, prometheus.CounterValue, float64(chn.Packets), fam, be, tb.Name, chn.Name),
 						prometheus.MustNewConstMetric(descPolicyBytes, prometheus.CounterValue, float64(chn.Bytes), fam, be, tb.Name, chn.Name),
 						prometheus.MustNewConstMetric(descPolicyInfo, prometheus.GaugeValue, 1, fam, be, tb.Name, chn.Name, chn.Policy),
 					)
 				}
-				groups = append(groups, group{1, key(fam, be, tb.Name, chn.Name), ms})
+				groups = append(groups, group{prio, key(fam, be, tb.Name, chn.Name), ms})
 			}
 		}
 

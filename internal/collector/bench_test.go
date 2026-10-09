@@ -45,14 +45,26 @@ func benchCollect(b *testing.B, services, selected, limit int) {
 	for i := 0; i < b.N; i++ {
 		ch := make(chan prometheus.Metric, 1024)
 		done := make(chan struct{})
+		var count int
+		var sawRule bool
 		go func() {
-			for range ch {
+			for m := range ch {
+				count++
+				if !sawRule && strings.Contains(m.Desc().String(), "iptables_rule_packets_total") {
+					sawRule = true
+				}
 			}
 			close(done)
 		}()
 		c.Collect(ch)
 		close(ch)
 		<-done
+		if count == 0 {
+			b.Fatal("collector emitted no metrics")
+		}
+		if limit > 0 && selected > 0 && !sawRule {
+			b.Fatal("no iptables_rule_packets_total emitted under limit")
+		}
 	}
 }
 
