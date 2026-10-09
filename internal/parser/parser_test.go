@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bufio"
 	"errors"
 	"os"
 	"strings"
@@ -126,7 +127,35 @@ func TestParseErrors(t *testing.T) {
 func TestParseLineTooLong(t *testing.T) {
 	long := "*filter\n:INPUT ACCEPT [0:0]\n[0:0] -A INPUT -m comment --comment \"" +
 		strings.Repeat("a", MaxLineBytes+10) + "\" -j ACCEPT\nCOMMIT\n"
-	if _, err := Parse(strings.NewReader(long)); err == nil {
+	_, err := Parse(strings.NewReader(long))
+	if err == nil {
 		t.Fatal("expected error for oversize line")
+	}
+	if !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("err = %v, want bufio.ErrTooLong in chain", err)
+	}
+}
+
+func TestParseRejectsEmptyAndDuplicateNames(t *testing.T) {
+	cases := []struct {
+		name, in string
+		line     int
+	}{
+		{"empty table", "*\n", 1},
+		{"empty chain", "*filter\n:\n", 2},
+		{"empty chain with policy", "*filter\n:INPUT ACCEPT [0:0]\n: ACCEPT\nCOMMIT\n", 3},
+		{"duplicate chain", "*filter\n:INPUT ACCEPT [0:0]\n:FOO - [0:0]\n:INPUT ACCEPT [0:0]\nCOMMIT\n", 4},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Parse(strings.NewReader(tc.in))
+			var pe *ParseError
+			if !errors.As(err, &pe) {
+				t.Fatalf("err = %T %v, want *ParseError", err, err)
+			}
+			if pe.Line != tc.line {
+				t.Errorf("line = %d, want %d (%v)", pe.Line, tc.line, err)
+			}
+		})
 	}
 }

@@ -48,6 +48,9 @@ func Parse(r io.Reader) ([]model.Table, error) {
 			if cur != nil {
 				return nil, &ParseError{n, "table started before COMMIT"}
 			}
+			if line[1:] == "" {
+				return nil, &ParseError{n, "empty table name"}
+			}
 			cur = &model.Table{Name: line[1:]}
 			byName = map[string]*model.Chain{}
 		case line == "COMMIT":
@@ -122,7 +125,14 @@ func parseChain(line string, n int, tb *model.Table, byName map[string]*model.Ch
 	if len(f) < 2 {
 		return &ParseError{n, "chain declaration needs a name and a policy"}
 	}
-	c := &model.Chain{Name: f[0][1:], Policy: f[1]}
+	name := f[0][1:]
+	if name == "" {
+		return &ParseError{n, "empty chain name"}
+	}
+	if _, dup := byName[name]; dup {
+		return &ParseError{n, fmt.Sprintf("duplicate chain %q", name)}
+	}
+	c := &model.Chain{Name: name, Policy: f[1]}
 	if len(f) >= 3 {
 		var err error
 		c.Packets, c.Bytes, err = parseCounters(f[2])
