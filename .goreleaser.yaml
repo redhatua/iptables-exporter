@@ -1,0 +1,56 @@
+version: 2
+project_name: iptables-exporter
+
+before:
+  hooks:
+    - go mod verify
+
+builds:
+  - id: iptables-exporter
+    main: ./cmd/iptables-exporter
+    binary: iptables-exporter
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X github.com/redhatua/iptables-exporter/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/redhatua/iptables-exporter/internal/buildinfo.Revision={{ .ShortCommit }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - deploy/systemd/iptables-exporter.service
+      - dashboards/iptables.json
+      - mixin/alerts.yaml
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - artifacts: archive
+
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args: ["sign-blob", "--bundle=${signature}", "${artifact}", "--yes"]
+    output: true
+
+release:
+  github:
+    owner: redhatua
+    name: iptables-exporter
+  extra_files:
+    - glob: dashboards/iptables.json
+    - glob: mixin/alerts.yaml
+
+changelog:
+  use: github
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]

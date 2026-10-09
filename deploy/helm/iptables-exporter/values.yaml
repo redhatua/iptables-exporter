@@ -1,0 +1,26 @@
+image:
+  repository: ghcr.io/redhatua/iptables-exporter
+  tag: ""            # defaults to the chart appVersion
+  pullPolicy: IfNotPresent
+
+# The exporter listens on the node's network namespace (hostNetwork), so this port is opened on every node.
+port: 9876
+
+# Extra arguments, for example selection and limits.
+args: []
+#  - --select.comment-regex=^svc/(\w+)$
+#  - --limit.series=10000
+
+resources:
+  requests: {cpu: 20m, memory: 32Mi}
+  limits: {memory: 128Mi}
+
+tolerations:
+  - operator: Exists
+
+nodeSelector: {}
+
+podMonitor:
+  enabled: false
+  interval: 30s
+  labels: {}

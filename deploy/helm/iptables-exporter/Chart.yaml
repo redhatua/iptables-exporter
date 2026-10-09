@@ -1,0 +1,6 @@
+apiVersion: v2
+name: iptables-exporter
+description: DaemonSet that exports iptables counters of each node
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
