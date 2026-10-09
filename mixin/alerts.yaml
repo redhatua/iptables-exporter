@@ -1,0 +1,51 @@
+"groups":
+- "name": "iptables-exporter"
+  "rules":
+  - "alert": "IptablesExporterDown"
+    "annotations":
+      "description": "Prometheus cannot scrape the exporter."
+      "summary": "iptables-exporter is down on {{ $labels.instance }}"
+    "expr": "up{job=\"iptables-exporter\"} == 0"
+    "for": "5m"
+    "labels":
+      "severity": "critical"
+  - "alert": "IptablesCollectionFailing"
+    "annotations":
+      "description": "The save command failed, timed out or produced an incomplete dump. Counters for this target are omitted."
+      "summary": "iptables collection failing on {{ $labels.instance }} ({{ $labels.family }}/{{ $labels.backend }})"
+    "expr": "iptables_up{job=\"iptables-exporter\"} == 0"
+    "for": "5m"
+    "labels":
+      "severity": "warning"
+  - "alert": "IptablesSnapshotStale"
+    "annotations":
+      "description": "No successful collection for more than 300 seconds."
+      "summary": "iptables-exporter snapshot is stale on {{ $labels.instance }} ({{ $labels.family }}/{{ $labels.backend }})"
+    "expr": "time() - iptables_snapshot_timestamp_seconds{job=\"iptables-exporter\"} > 300"
+    "for": "5m"
+    "labels":
+      "severity": "warning"
+  - "alert": "IptablesSeriesOmitted"
+    "annotations":
+      "description": "The series limit truncated the scrape. Raise --limit.series or narrow rule selection."
+      "summary": "iptables-exporter is omitting series on {{ $labels.instance }}"
+    "expr": "iptables_series_omitted{job=\"iptables-exporter\"} > 0"
+    "for": "15m"
+    "labels":
+      "severity": "warning"
+  - "alert": "IptablesDuplicateRuleIDs"
+    "annotations":
+      "description": "Rules sharing an ID within a chain are dropped from the metrics. Make the IDs unique."
+      "summary": "Duplicate iptx:id rule IDs on {{ $labels.instance }} ({{ $labels.family }}/{{ $labels.backend }})"
+    "expr": "iptables_duplicate_rule_ids{job=\"iptables-exporter\"} > 0"
+    "for": "15m"
+    "labels":
+      "severity": "warning"
+  - "alert": "IptablesPolicyDropRateHigh"
+    "annotations":
+      "description": "Packets are hitting the DROP policy of {{ $labels.table }}/{{ $labels.chain }} on {{ $labels.instance }}; see the dashboard policy row."
+      "summary": "High DROP-policy rate on {{ $labels.instance }} ({{ $labels.table }}/{{ $labels.chain }})"
+    "expr": "sum by (instance, family, backend, table, chain) (rate(iptables_chain_policy_packets_total{job=\"iptables-exporter\"}[5m]) * on (instance, family, backend, table, chain) iptables_chain_policy_info{job=\"iptables-exporter\", policy=\"DROP\"}) > 100"
+    "for": "10m"
+    "labels":
+      "severity": "warning"

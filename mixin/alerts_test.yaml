@@ -1,0 +1,78 @@
+rule_files:
+  - alerts.yaml
+evaluation_interval: 1m
+
+tests:
+  - name: stale snapshot fires
+    interval: 1m
+    input_series:
+      - series: 'iptables_snapshot_timestamp_seconds{job="iptables-exporter",instance="h1:9876",family="ipv4",backend="legacy"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: IptablesSnapshotStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: iptables-exporter
+              instance: "h1:9876"
+              family: ipv4
+              backend: legacy
+            exp_annotations:
+              summary: "iptables-exporter snapshot is stale on h1:9876 (ipv4/legacy)"
+              description: "No successful collection for more than 300 seconds."
+
+  - name: fresh snapshot does not fire
+    interval: 1m
+    input_series:
+      - series: 'iptables_snapshot_timestamp_seconds{job="iptables-exporter",instance="h1:9876",family="ipv4",backend="legacy"}'
+        values: '0+60x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: IptablesSnapshotStale
+        exp_alerts: []
+
+  - name: duplicate rule ids fire
+    interval: 1m
+    input_series:
+      - series: 'iptables_duplicate_rule_ids{job="iptables-exporter",instance="h1:9876",family="ipv4",backend="nft"}'
+        values: '2x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: IptablesDuplicateRuleIDs
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: iptables-exporter
+              instance: "h1:9876"
+              family: ipv4
+              backend: nft
+            exp_annotations:
+              summary: "Duplicate iptx:id rule IDs on h1:9876 (ipv4/nft)"
+              description: "Rules sharing an ID within a chain are dropped from the metrics. Make the IDs unique."
+
+  - name: drop policy rate high fires only for DROP policies
+    interval: 1m
+    input_series:
+      - series: 'iptables_chain_policy_packets_total{job="iptables-exporter",instance="h1:9876",family="ipv4",backend="legacy",table="filter",chain="FORWARD"}'
+        values: '0+12000x30'
+      - series: 'iptables_chain_policy_info{job="iptables-exporter",instance="h1:9876",family="ipv4",backend="legacy",table="filter",chain="FORWARD",policy="DROP"}'
+        values: '1x30'
+      - series: 'iptables_chain_policy_packets_total{job="iptables-exporter",instance="h1:9876",family="ipv4",backend="legacy",table="filter",chain="OUTPUT"}'
+        values: '0+12000x30'
+      - series: 'iptables_chain_policy_info{job="iptables-exporter",instance="h1:9876",family="ipv4",backend="legacy",table="filter",chain="OUTPUT",policy="ACCEPT"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: IptablesPolicyDropRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: "h1:9876"
+              family: ipv4
+              backend: legacy
+              table: filter
+              chain: FORWARD
+            exp_annotations:
+              summary: "High DROP-policy rate on h1:9876 (filter/FORWARD)"
+              description: "Packets are hitting the DROP policy of filter/FORWARD on h1:9876; see the dashboard policy row."
