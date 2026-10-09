@@ -54,12 +54,15 @@ func (f *ExecFetcher) version(ctx context.Context, t Target) string {
 	if v, ok := f.versions[t]; ok {
 		return v
 	}
-	v := "unknown"
-	if out, err := f.Runner.Run(ctx, t.Binary, "--version"); err == nil {
-		if m := versionRe.FindSubmatch(out); m != nil {
-			v = string(m[1])
-		}
+	out, err := f.Runner.Run(ctx, t.Binary, "--version")
+	if err != nil {
+		return "unknown"
 	}
+	m := versionRe.FindSubmatch(out)
+	if m == nil {
+		return "unknown"
+	}
+	v := string(m[1])
 	if f.versions == nil {
 		f.versions = map[Target]string{}
 	}

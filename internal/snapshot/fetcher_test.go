@@ -46,3 +46,23 @@ func TestExecFetcherCommandFailure(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestExecFetcherVersionNotCachedOnProbeFailure(t *testing.T) {
+	dir := t.TempDir()
+	src, _ := os.ReadFile("../../testdata/docker.save")
+	os.WriteFile(filepath.Join(dir, "dump"), src, 0o644)
+	counter := filepath.Join(dir, "n")
+	script := "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  if [ ! -e " + counter + " ]; then touch " + counter + "; exit 1; fi\n  echo \"iptables-save v1.8.10 (legacy)\"; exit 0\nfi\ncat " + filepath.Join(dir, "dump") + "\n"
+	bin := filepath.Join(dir, "save")
+	os.WriteFile(bin, []byte(script), 0o755)
+	f := newFetcher()
+	tg := Target{Binary: bin}
+	got, err := f.Fetch(context.Background(), tg)
+	if err != nil || got.Version != "unknown" {
+		t.Fatalf("first: %+v %v", got, err)
+	}
+	got, err = f.Fetch(context.Background(), tg)
+	if err != nil || got.Version != "1.8.10" {
+		t.Fatalf("second: %+v %v", got, err)
+	}
+}

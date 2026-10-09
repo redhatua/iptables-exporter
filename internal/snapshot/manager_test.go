@@ -68,23 +68,27 @@ func TestFailureOmitsTablesKeepsLastSuccess(t *testing.T) {
 func TestBackoffSkipsAttempts(t *testing.T) {
 	tg := Target{Family: "ipv4", Backend: "legacy", Binary: "x"}
 	f := &fakeFetcher{fail: map[Target]bool{tg: true}, calls: map[Target]int{}}
-	m, clock := newTestManager(f, tg)
+	m, _ := newTestManager(f, tg)
+	// failure n skips backoff ticks: f1 -> 0, f2 -> 1, f3 -> 3, f4 -> 7.
+	want := []int{1, 2, 2, 3, 3, 3, 3, 4}
+	for i, w := range want {
+		m.tick(context.Background())
+		if f.calls[tg] != w {
+			t.Fatalf("after tick %d calls = %d, want %d", i+1, f.calls[tg], w)
+		}
+	}
+}
 
-	m.tick(context.Background()) // failure 1 -> next attempt at +15s
-	*clock = clock.Add(5 * time.Second)
-	m.tick(context.Background()) // skipped
-	if f.calls[tg] != 1 {
-		t.Fatalf("calls = %d, want 1", f.calls[tg])
-	}
-	*clock = clock.Add(10 * time.Second)
-	m.tick(context.Background()) // failure 2 -> next attempt at +30s
-	if f.calls[tg] != 2 {
-		t.Fatalf("calls = %d, want 2", f.calls[tg])
-	}
-	*clock = clock.Add(20 * time.Second)
-	m.tick(context.Background()) // skipped (only 20s of 30s)
-	if f.calls[tg] != 2 {
-		t.Fatalf("calls = %d, want 2", f.calls[tg])
+func TestCancelledFailureNotRecorded(t *testing.T) {
+	tg := Target{Family: "ipv4", Backend: "legacy", Binary: "x"}
+	f := &fakeFetcher{fail: map[Target]bool{tg: true}, calls: map[Target]int{}}
+	m, _ := newTestManager(f, tg)
+	before := m.Current()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	m.tick(ctx)
+	if m.Current() != before || m.Ready() || m.state[tg].failures != 0 {
+		t.Fatalf("shutdown tick published or recorded failure")
 	}
 }
 

@@ -29,7 +29,7 @@ type Snapshot struct {
 type targetState struct {
 	last     Result
 	failures int
-	next     time.Time
+	skip     int
 }
 
 // Manager owns the collection loop.
@@ -82,7 +82,8 @@ func (m *Manager) tick(ctx context.Context) {
 	results := make([]Result, 0, len(m.targets))
 	for _, t := range m.targets {
 		st := m.state[t]
-		if m.now().Before(st.next) {
+		if st.skip > 0 {
+			st.skip--
 			results = append(results, st.last)
 			continue
 		}
@@ -90,14 +91,18 @@ func (m *Manager) tick(ctx context.Context) {
 		f, err := m.fetcher.Fetch(ctx, t)
 		d := m.now().Sub(start)
 		if err != nil {
+			if ctx.Err() != nil {
+				return // shutting down: do not record a failure or publish
+			}
 			st.failures++
-			st.next = m.now().Add(backoffDelay(m.interval, st.failures))
+			ticks := int((backoffDelay(m.interval, st.failures) + m.interval - 1) / m.interval)
+			st.skip = ticks - 1
 			m.logger.Warn("collection failed", "family", t.Family, "backend", t.Backend,
 				"failures", st.failures, "err", err)
 			st.last = Result{Target: t, Up: false, Version: st.last.Version, Taken: st.last.Taken, Duration: d}
 		} else {
 			st.failures = 0
-			st.next = time.Time{}
+			st.skip = 0
 			st.last = Result{Target: t, Up: true, Version: f.Version, Tables: f.Tables, Taken: m.now(), Duration: d}
 		}
 		results = append(results, st.last)
