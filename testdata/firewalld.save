@@ -1,0 +1,11 @@
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:INPUT_ZONES - [0:0]
+[0:0] -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+[0:0] -A INPUT -j INPUT_ZONES
+[0:0] -A INPUT -m conntrack --ctstate INVALID -j DROP
+[0:0] -A INPUT -j REJECT --reject-with icmp-host-prohibited
+[0:0] -A INPUT_ZONES ! -i lo -g IN_public
+COMMIT

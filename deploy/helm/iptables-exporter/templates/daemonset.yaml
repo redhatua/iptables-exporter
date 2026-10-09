@@ -1,0 +1,58 @@
+# NOTE: hostNetwork plus NET_ADMIN/NET_RAW fails the Kubernetes "baseline" Pod Security Standard.
+# Install into a namespace labelled pod-security.kubernetes.io/enforce=privileged.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "iptables-exporter.name" . }}
+  labels:
+    {{- include "iptables-exporter.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "iptables-exporter.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "iptables-exporter.labels" . | nindent 8 }}
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: exporter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --web.listen-address=:{{ .Values.port }}
+            {{- range .Values.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- with .Values.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet: {path: /-/ready, port: metrics}
+          livenessProbe:
+            httpGet: {path: /healthz, port: metrics}
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+              add: [NET_ADMIN, NET_RAW]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

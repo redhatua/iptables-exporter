@@ -1,0 +1,9 @@
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:f2b-sshd - [0:0]
+[900:72000] -A INPUT -p tcp -m multiport --dports 22 -j f2b-sshd
+[20:1200] -A f2b-sshd -s 203.0.113.9/32 -j REJECT --reject-with icmp-port-unreachable
+[880:70800] -A f2b-sshd -j RETURN
+COMMIT

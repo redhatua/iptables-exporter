@@ -1,0 +1,3 @@
+*filter
+:INPUT ACCEPT [oops:0]
+COMMIT

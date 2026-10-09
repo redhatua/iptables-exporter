@@ -1,0 +1,35 @@
+image:
+  repository: ghcr.io/redhatua/iptables-exporter
+  tag: ""            # defaults to the chart appVersion
+  pullPolicy: IfNotPresent
+
+# The exporter listens on the node's network namespace (hostNetwork), so this port is opened on every node.
+port: 9876
+
+# Extra arguments, for example selection and limits. Setting args replaces this default list.
+# --no-collect.user-chain-rules is the default because kube-proxy creates thousands of
+# KUBE-SVC/KUBE-SEP chains whose names churn; their per-chain iptables_rules series would
+# exhaust the series limit and create short-lived series. Remove it to export them.
+args:
+  - --no-collect.user-chain-rules
+#  - --select.comment-regex=^svc/(\w+)$
+#  - --limit.series=10000
+
+resources:
+  requests: {cpu: 20m, memory: 64Mi}
+  limits: {memory: 256Mi}
+
+# GOMEMLIMIT stays below the container memory limit so the Go GC works harder before an OOM kill.
+env:
+  - name: GOMEMLIMIT
+    value: 192MiB
+
+tolerations:
+  - operator: Exists
+
+nodeSelector: {}
+
+podMonitor:
+  enabled: false
+  interval: 30s
+  labels: {}

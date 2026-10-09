@@ -1,0 +1,27 @@
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FIREWALL - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-SERVICES - [0:0]
+[120:9600] -A INPUT -m conntrack --ctstate NEW -m comment --comment "kubernetes service portals" -j KUBE-SERVICES
+[0:0] -A INPUT -j KUBE-FIREWALL
+[44:3520] -A FORWARD -m comment --comment "kubernetes forwarding rules" -j KUBE-FORWARD
+[0:0] -A KUBE-FIREWALL -m comment --comment "kubernetes firewall for dropping marked packets" -m mark --mark 0x8000/0x8000 -j DROP
+[44:3520] -A KUBE-FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "kubernetes forwarding conntrack rule" -j ACCEPT
+COMMIT
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+:KUBE-SERVICES - [0:0]
+:KUBE-SVC-NPX46M4PTMTKRN6Y - [0:0]
+:KUBE-SEP-AAAA - [0:0]
+[7:420] -A PREROUTING -m comment --comment "kubernetes service portals" -j KUBE-SERVICES
+[7:420] -A KUBE-SERVICES -d 10.96.0.1/32 -p tcp -m comment --comment "default/kubernetes:https cluster IP" -m tcp --dport 443 -j KUBE-SVC-NPX46M4PTMTKRN6Y
+[7:420] -A KUBE-SVC-NPX46M4PTMTKRN6Y -m comment --comment "default/kubernetes:https -> 10.0.0.5:6443" -j KUBE-SEP-AAAA
+[7:420] -A KUBE-SEP-AAAA -p tcp -m comment --comment "default/kubernetes:https" -m tcp -j DNAT --to-destination 10.0.0.5:6443
+COMMIT

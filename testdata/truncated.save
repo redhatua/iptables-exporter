@@ -1,0 +1,3 @@
+*filter
+:INPUT ACCEPT [0:0]
+[1:60] -A INPUT -j ACCEPT

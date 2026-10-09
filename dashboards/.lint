@@ -1,0 +1,12 @@
+# node_exporter conntrack metrics come from a different scrape job and port than
+# iptables-exporter, so $job/$instance cannot be applied to them. The panel
+# joins by host instead (see its description).
+exclusions:
+  target-job-rule:
+    reason: "node_exporter series do not share the iptables-exporter job"
+    entries:
+      - panel: "Conntrack table usage"
+  target-instance-rule:
+    reason: "node_exporter series do not share the iptables-exporter instance (different port)"
+    entries:
+      - panel: "Conntrack table usage"
