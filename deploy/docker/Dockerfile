@@ -20,5 +20,7 @@ COPY --from=build /out/iptables-exporter /usr/local/bin/iptables-exporter
 LABEL org.opencontainers.image.source="https://github.com/redhatua/iptables-exporter" \
       org.opencontainers.image.licenses="Apache-2.0"
 EXPOSE 9876
-# Runs as root inside the container but with only NET_ADMIN and NET_RAW (see the Helm chart securityContext).
+# Runs as root on purpose: file capabilities on the exporter binary would not reach the *-save child
+# process, and no_new_privs (hardened Pod Security) blocks them anyway. Instead the runtime restricts
+# the capability set to NET_ADMIN and NET_RAW (see the Helm chart securityContext).
 ENTRYPOINT ["/usr/local/bin/iptables-exporter"]

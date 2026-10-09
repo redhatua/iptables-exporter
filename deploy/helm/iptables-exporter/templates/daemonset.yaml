@@ -35,6 +35,10 @@ spec:
             {{- range .Values.args }}
             - {{ . | quote }}
             {{- end }}
+          {{- with .Values.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: metrics
               containerPort: {{ .Values.port }}
