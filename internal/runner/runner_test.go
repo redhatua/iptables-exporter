@@ -37,9 +37,14 @@ func TestRunNonZeroExitIncludesStderr(t *testing.T) {
 
 func TestRunOutputTooLarge(t *testing.T) {
 	r := Runner{Timeout: 5 * time.Second, MaxOutput: 1000}
+	start := time.Now()
 	_, err := r.Run(context.Background(), script(t, `exec yes`))
 	if !errors.Is(err, ErrOutputTooLarge) {
 		t.Fatalf("err = %v", err)
+	}
+	// Without an explicit kill, yes would only die at the 5s Timeout.
+	if elapsed := time.Since(start); elapsed >= 2*time.Second {
+		t.Fatalf("took %s: process was not killed on oversize output", elapsed)
 	}
 }
 

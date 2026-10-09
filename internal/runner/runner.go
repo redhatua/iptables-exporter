@@ -15,7 +15,7 @@ import (
 // ErrOutputTooLarge is returned when stdout exceeds Runner.MaxOutput.
 var ErrOutputTooLarge = errors.New("runner: output exceeds limit")
 
-// Runner runs one command at a time-bounded, size-bounded.
+// Runner runs one command, bounded by a timeout and an output size limit.
 type Runner struct {
 	Timeout   time.Duration
 	MaxOutput int64
