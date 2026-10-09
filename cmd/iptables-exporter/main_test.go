@@ -14,6 +14,10 @@ func TestValidateMetricsPath(t *testing.T) {
 		{"/", false},
 		{"/healthz", false},
 		{"/-/ready", false},
+		{"/metrics/{", false},
+		{"/a{b}", false},
+		{"/a}b", false},
+		{"/a b", false},
 	}
 	for _, tc := range cases {
 		err := validateMetricsPath(tc.path)

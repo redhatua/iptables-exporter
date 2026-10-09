@@ -43,6 +43,9 @@ func validateMetricsPath(p string) error {
 	if !strings.HasPrefix(p, "/") {
 		return fmt.Errorf("--web.telemetry-path %q must start with \"/\"", p)
 	}
+	if strings.ContainsAny(p, "{} \t\r\n") {
+		return fmt.Errorf("--web.telemetry-path %q must not contain braces or whitespace (http.ServeMux treats them as pattern syntax)", p)
+	}
 	if reservedPaths[p] {
 		return fmt.Errorf("--web.telemetry-path %q is reserved (/, /healthz and /-/ready are served by the exporter)", p)
 	}
