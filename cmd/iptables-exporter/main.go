@@ -94,7 +94,7 @@ func run() int {
 	}
 
 	promslogflag.AddFlags(app, logCfg)
-	webFlags := kingpinflag.AddFlags(app, ":9876")
+	webFlags := kingpinflag.AddFlags(app, ":10058")
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	logger := promslog.New(logCfg)

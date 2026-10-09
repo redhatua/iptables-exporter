@@ -58,7 +58,7 @@ rulesets without the iptables-nft shim are not supported in v1.
 ## Flags
 
     --config.file=CONFIG.FILE   Optional YAML file; its values override command-line flags.
-    --web.listen-address=:9876  Addresses on which to expose metrics (repeatable).
+    --web.listen-address=:10058  Addresses on which to expose metrics (repeatable).
     --web.telemetry-path=/metrics
     --web.config.file          TLS / basic auth configuration (exporter-toolkit format).
     --web.systemd-socket       Use systemd socket activation.

@@ -4,7 +4,7 @@ image:
   pullPolicy: IfNotPresent
 
 # The exporter listens on the node's network namespace (hostNetwork), so this port is opened on every node.
-port: 9876
+port: 10058
 
 # Extra arguments, for example selection and limits. Setting args replaces this default list.
 # --no-collect.user-chain-rules is the default because kube-proxy creates thousands of
