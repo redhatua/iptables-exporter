@@ -4,6 +4,7 @@ package selector
 import (
 	"fmt"
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/redhatua/iptables-exporter/internal/model"
 )
@@ -51,7 +52,7 @@ func (s *Selector) id(r model.Rule) (string, bool) {
 	for _, c := range r.Comments {
 		if s.convention {
 			// An over-long token is not a valid ID; never truncate it.
-			if m := idConvention.FindStringSubmatch(c); m != nil && len(m[1]) <= maxConventionIDLen {
+			if m := idConvention.FindStringSubmatch(c); m != nil && len(m[1]) <= maxConventionIDLen && utf8.ValidString(m[1]) {
 				return m[1], true
 			}
 		}
@@ -64,7 +65,7 @@ func (s *Selector) id(r model.Rule) (string, bool) {
 			if len(m) > 1 {
 				id = m[1]
 			}
-			if id != "" && len(id) <= maxIDLen {
+			if id != "" && len(id) <= maxIDLen && utf8.ValidString(id) {
 				return id, true
 			}
 		}

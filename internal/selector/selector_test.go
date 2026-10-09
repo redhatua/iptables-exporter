@@ -116,3 +116,21 @@ func TestConventionSkipsCommentWithoutIDAndUsesNext(t *testing.T) {
 		t.Fatalf("res = %+v", res)
 	}
 }
+
+func TestInvalidUTF8RegexIDIsSkipped(t *testing.T) {
+	s, err := New(false, []string{`^(.+)$`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tables := []model.Table{{Name: "filter", Chains: []*model.Chain{{
+		Name: "INPUT", Policy: "ACCEPT",
+		Rules: []model.Rule{
+			{Comments: []string{"bad\xffid"}},
+			{Comments: []string{"good"}},
+		},
+	}}}}
+	res := s.Select(tables)
+	if len(res.Rules) != 1 || res.Rules[0].ID != "good" {
+		t.Fatalf("res = %+v", res)
+	}
+}

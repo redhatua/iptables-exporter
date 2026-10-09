@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/redhatua/iptables-exporter/internal/model"
 )
@@ -36,6 +37,7 @@ func Parse(r io.Reader) ([]model.Table, error) {
 		tables []model.Table
 		cur    *model.Table
 		byName map[string]*model.Chain
+		seen   = map[string]bool{}
 		n      int
 	)
 	for sc.Scan() {
@@ -51,6 +53,13 @@ func Parse(r io.Reader) ([]model.Table, error) {
 			if line[1:] == "" {
 				return nil, &ParseError{n, "empty table name"}
 			}
+			if !utf8.ValidString(line[1:]) {
+				return nil, &ParseError{n, "table name is not valid UTF-8"}
+			}
+			if seen[line[1:]] {
+				return nil, &ParseError{n, fmt.Sprintf("duplicate table %q", line[1:])}
+			}
+			seen[line[1:]] = true
 			cur = &model.Table{Name: line[1:]}
 			byName = map[string]*model.Chain{}
 		case line == "COMMIT":
@@ -101,7 +110,7 @@ func parseStatement(line string, n int, tb *model.Table, byName map[string]*mode
 		return &ParseError{n, fmt.Sprintf("rule references undeclared chain %q", toks[1])}
 	}
 	rest := toks[2:]
-	rule := model.Rule{Packets: pkts, Bytes: bytes, Tokens: rest}
+	rule := model.Rule{Packets: pkts, Bytes: bytes}
 	for i := 0; i < len(rest); i++ {
 		switch rest[i] {
 		case "-j", "-g":
@@ -128,6 +137,9 @@ func parseChain(line string, n int, tb *model.Table, byName map[string]*model.Ch
 	name := f[0][1:]
 	if name == "" {
 		return &ParseError{n, "empty chain name"}
+	}
+	if !utf8.ValidString(name) {
+		return &ParseError{n, "chain name is not valid UTF-8"}
 	}
 	if _, dup := byName[name]; dup {
 		return &ParseError{n, fmt.Sprintf("duplicate chain %q", name)}

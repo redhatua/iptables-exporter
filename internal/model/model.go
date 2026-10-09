@@ -1,13 +1,12 @@
 // Package model holds the in-memory representation of an iptables-save dump.
 package model
 
-// Rule is one "-A" line. Tokens are the opaque, ordered tokens after "-A <chain>".
+// Rule is one "-A" line, reduced to what the exporter consumes.
 type Rule struct {
 	Packets  uint64
 	Bytes    uint64
 	Target   string
 	Comments []string
-	Tokens   []string
 }
 
 // Chain is a chain declaration plus its rules. Policy is "-" for user-defined chains.

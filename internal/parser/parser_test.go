@@ -145,6 +145,9 @@ func TestParseRejectsEmptyAndDuplicateNames(t *testing.T) {
 		{"empty chain", "*filter\n:\n", 2},
 		{"empty chain with policy", "*filter\n:INPUT ACCEPT [0:0]\n: ACCEPT\nCOMMIT\n", 3},
 		{"duplicate chain", "*filter\n:INPUT ACCEPT [0:0]\n:FOO - [0:0]\n:INPUT ACCEPT [0:0]\nCOMMIT\n", 4},
+		{"duplicate table", "*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n*filter\n", 4},
+		{"invalid utf-8 table", "# c\n*fil\xfftr\n", 2},
+		{"invalid utf-8 chain", "*filter\n:INPUT ACCEPT [0:0]\n:FO\xffO - [0:0]\nCOMMIT\n", 3},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func FuzzParse(f *testing.F) {
@@ -22,9 +23,12 @@ func FuzzParse(f *testing.F) {
 			return
 		}
 		for _, tb := range tables {
+			if tb.Name == "" || !utf8.ValidString(tb.Name) {
+				t.Fatalf("bad table name %q accepted in %q", tb.Name, in)
+			}
 			for _, c := range tb.Chains {
-				if c.Name == "" {
-					t.Fatalf("empty chain name accepted in %q", in)
+				if c.Name == "" || !utf8.ValidString(c.Name) {
+					t.Fatalf("bad chain name %q accepted in %q", c.Name, in)
 				}
 			}
 		}
