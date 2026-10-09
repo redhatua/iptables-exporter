@@ -244,7 +244,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Packets/s dropped by a DROP policy. Chains whose policy is not DROP are excluded. Counts only packets that reach a DROP policy; drops made by explicit DROP rules appear only if that rule is selected. A chain appears only while its policy is DROP.",
+         "description": "Packets/s dropped by a DROP policy. Chains whose policy is not DROP are excluded. Counts only packets that reach a DROP policy; Explicit DROP rules are not counted here; see the Selected rules panels. A chain appears only while its policy is DROP.",
          "fieldConfig": {
             "defaults": {
                "unit": "pps"
@@ -385,7 +385,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Only rules selected with iptx:id=<name> or --select.comment-regex are shown; this is not a complete accept/drop total. An ACCEPT at one hook is not final delivery. Counters reset on iptables-restore or flush.",
+         "description": "Instant values of the packets counter per selected rule. Only rules selected with iptx:id=<name> or --select.comment-regex are shown; this is not a complete accept/drop total. An ACCEPT at one hook is not final delivery. Counters reset on iptables-restore or flush.",
          "fieldConfig": {
             "defaults": {
                "unit": "short"
@@ -432,7 +432,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Current rule count per chain from the last successful snapshot; not a traffic measure.",
+         "description": "Top 50 chains by rule count. Current rule count per chain from the last successful snapshot; not a traffic measure.",
          "fieldConfig": {
             "defaults": {
                "unit": "short"
@@ -452,7 +452,7 @@
                   "type": "prometheus",
                   "uid": "$datasource"
                },
-               "expr": "sum by (family, backend, table, chain) (iptables_rules{job=~\"$job\", instance=~\"$instance\"})",
+               "expr": "topk(50, sum by (family, backend, table, chain) (iptables_rules{job=~\"$job\", instance=~\"$instance\"}))",
                "legendFormat": "{{family}}/{{backend}} {{table}}/{{chain}}"
             }
          ],
@@ -686,7 +686,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Joined by host (instance without port) because node_exporter and iptables-exporter use different ports. Empty if node_exporter or nf_conntrack is absent. Ignores the instance variable: it shows every host that node_exporter reports. Hosts whose instance label has no port are not matched.",
+         "description": "Joined by host (instance without port) because node_exporter and iptables-exporter use different ports. Empty if node_exporter or nf_conntrack is absent. Ignores the instance variable: it shows every host that node_exporter reports. Instances without a port are not rewritten, get no node label and are aggregated under an empty node.",
          "fieldConfig": {
             "defaults": {
                "unit": "percentunit"
