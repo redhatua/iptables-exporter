@@ -30,6 +30,9 @@ func FuzzParse(f *testing.F) {
 				if c.Name == "" || !utf8.ValidString(c.Name) {
 					t.Fatalf("bad chain name %q accepted in %q", c.Name, in)
 				}
+				if !utf8.ValidString(c.Policy) {
+					t.Fatalf("bad chain policy %q accepted in %q", c.Policy, in)
+				}
 			}
 		}
 	})

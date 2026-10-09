@@ -144,6 +144,9 @@ func parseChain(line string, n int, tb *model.Table, byName map[string]*model.Ch
 	if _, dup := byName[name]; dup {
 		return &ParseError{n, fmt.Sprintf("duplicate chain %q", name)}
 	}
+	if !utf8.ValidString(f[1]) {
+		return &ParseError{n, "chain policy is not valid UTF-8"}
+	}
 	c := &model.Chain{Name: name, Policy: f[1]}
 	if len(f) >= 3 {
 		var err error
