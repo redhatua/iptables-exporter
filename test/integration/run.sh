@@ -6,8 +6,8 @@ cd /src
 go build -buildvcs=false -trimpath -o /tmp/iptables-exporter ./cmd/iptables-exporter
 
 # Distinct rule sets per backend so we can tell them apart.
-iptables-legacy  -A INPUT -i lo -p tcp --dport 9876 -m comment --comment "iptx:id=legacy-scrape" -j ACCEPT
-iptables-nft     -A INPUT -i lo -p tcp --dport 9876 -m comment --comment "iptx:id=nft-scrape"    -j ACCEPT
+iptables-legacy  -A INPUT -i lo -p tcp --dport 10058 -m comment --comment "iptx:id=legacy-scrape" -j ACCEPT
+iptables-nft     -A INPUT -i lo -p tcp --dport 10058 -m comment --comment "iptx:id=nft-scrape"    -j ACCEPT
 ip6tables-legacy -A INPUT -p ipv6-icmp -m comment --comment "iptx:id=legacy6-icmp" -j ACCEPT
 ip6tables-nft    -A INPUT -p ipv6-icmp -m comment --comment "iptx:id=nft6-icmp"    -j ACCEPT
 
@@ -16,19 +16,19 @@ ip6tables-nft    -A INPUT -p ipv6-icmp -m comment --comment "iptx:id=nft6-icmp" 
 # nft does not need it).
 capsh --caps="cap_net_admin,cap_net_raw,cap_dac_read_search,cap_setpcap,cap_setuid,cap_setgid+eip" --keep=1 --user=nobody \
       --addamb=cap_net_admin --addamb=cap_net_raw --addamb=cap_dac_read_search -- \
-      -c 'exec /tmp/iptables-exporter --web.listen-address=127.0.0.1:9876 --collect.interval=5s' &
+      -c 'exec /tmp/iptables-exporter --web.listen-address=127.0.0.1:10058 --collect.interval=5s' &
 EXPORTER=$!
 trap 'kill $EXPORTER ${EXPORTER2:-} 2>/dev/null || true' EXIT
 
 for _ in $(seq 1 50); do
-  curl -fs http://127.0.0.1:9876/-/ready >/dev/null 2>&1 && break
+  curl -fs http://127.0.0.1:10058/-/ready >/dev/null 2>&1 && break
   sleep 0.2
 done
 
-# Generate traffic that hits the lo/9876 rules, then wait for a fresh snapshot.
-for _ in 1 2 3; do curl -fs http://127.0.0.1:9876/healthz >/dev/null; done
+# Generate traffic that hits the lo/10058 rules, then wait for a fresh snapshot.
+for _ in 1 2 3; do curl -fs http://127.0.0.1:10058/healthz >/dev/null; done
 sleep 7
-m=$(curl -fs http://127.0.0.1:9876/metrics)
+m=$(curl -fs http://127.0.0.1:10058/metrics)
 
 fail() { echo "FAIL: $1"; echo "$m" | grep '^iptables_' || true; exit 1; }
 want() { grep -Eq "$1" <<<"$m" || fail "missing: $1"; }
@@ -52,14 +52,14 @@ want '^iptables_series_omitted 0'
 # down while nft keeps working.
 capsh --caps="cap_net_admin,cap_net_raw,cap_setpcap,cap_setuid,cap_setgid+eip" --keep=1 --user=nobody \
       --addamb=cap_net_admin --addamb=cap_net_raw -- \
-      -c 'exec /tmp/iptables-exporter --web.listen-address=127.0.0.1:9877 --collect.interval=5s' &
+      -c 'exec /tmp/iptables-exporter --web.listen-address=127.0.0.1:10059 --collect.interval=5s' &
 EXPORTER2=$!
 for _ in $(seq 1 50); do
-  curl -fs http://127.0.0.1:9877/-/ready >/dev/null 2>&1 && break
+  curl -fs http://127.0.0.1:10059/-/ready >/dev/null 2>&1 && break
   sleep 0.2
 done
 sleep 1
-m=$(curl -fs http://127.0.0.1:9877/metrics)
+m=$(curl -fs http://127.0.0.1:10059/metrics)
 for fam in ipv4 ipv6; do
   want "^iptables_up\\{backend=\"legacy\",family=\"$fam\"\\} 0"
   want "^iptables_up\\{backend=\"nft\",family=\"$fam\"\\} 1"
