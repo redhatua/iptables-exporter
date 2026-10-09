@@ -94,11 +94,16 @@ func find(t *testing.T, got map[string][]*dto.Metric, name string, want map[stri
 
 func newCollector(t *testing.T, s *snapshot.Snapshot, limit int) *Collector {
 	t.Helper()
+	return newCollectorOpts(t, s, limit, true)
+}
+
+func newCollectorOpts(t *testing.T, s *snapshot.Snapshot, limit int, userChainRules bool) *Collector {
+	t.Helper()
 	sel, err := selector.New(true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return New(fakeSrc{s}, sel, limit)
+	return New(fakeSrc{s}, sel, limit, userChainRules)
 }
 
 func TestPolicyAndHealthMetrics(t *testing.T) {
@@ -275,5 +280,25 @@ func TestDuplicateRuleIDsReported(t *testing.T) {
 	}
 	if len(got["iptables_rule_packets_total"]) != 0 {
 		t.Error("duplicate IDs must not produce series")
+	}
+}
+
+func TestUserChainRulesDisabled(t *testing.T) {
+	// docker.save: 5 built-in chains (20 series) + ssh-in pair; DOCKER and
+	// DOCKER-USER are user chains. Limit 22 would omit nothing without them.
+	got := gather(t, newCollectorOpts(t, snapOf(t, true, dockerText(t)), 22, false))
+	for _, ch := range []string{"DOCKER", "DOCKER-USER"} {
+		if _, ok := find(t, got, "iptables_rules", map[string]string{"chain": ch}); ok {
+			t.Errorf("user chain %s must have no iptables_rules series", ch)
+		}
+	}
+	if _, ok := find(t, got, "iptables_rules", map[string]string{"chain": "INPUT"}); !ok {
+		t.Error("built-in chain gauge must remain")
+	}
+	if n := len(got["iptables_rule_packets_total"]); n != 1 {
+		t.Errorf("selected rule series = %d, want 1", n)
+	}
+	if v, _ := find(t, got, "iptables_series_omitted", nil); v != 0 {
+		t.Errorf("omitted = %v, want 0 (user chains are not counted as omitted)", v)
 	}
 }

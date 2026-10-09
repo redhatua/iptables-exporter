@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -32,6 +34,26 @@ import (
 
 func main() { os.Exit(run()) }
 
+// reservedPaths are served by the exporter itself.
+var reservedPaths = map[string]bool{"/": true, "/healthz": true, "/-/ready": true}
+
+// validateMetricsPath rejects telemetry paths that would collide with or
+// panic the HTTP mux.
+func validateMetricsPath(p string) error {
+	if !strings.HasPrefix(p, "/") {
+		return fmt.Errorf("--web.telemetry-path %q must start with \"/\"", p)
+	}
+	if reservedPaths[p] {
+		return fmt.Errorf("--web.telemetry-path %q is reserved (/, /healthz and /-/ready are served by the exporter)", p)
+	}
+	return nil
+}
+
+// slogErrorLog adapts a slog logger to promhttp.Logger.
+type slogErrorLog struct{ l *slog.Logger }
+
+func (s slogErrorLog) Println(v ...interface{}) { s.l.Error(strings.TrimSpace(fmt.Sprintln(v...))) }
+
 func run() int {
 	cfg := config.Default()
 	// kingpin appends parsed values to a slice target, so bind empty slices
@@ -53,10 +75,17 @@ func run() int {
 	app.Flag("collect.backends", "Backends to collect (repeatable): legacy, nft.").Default(defBackends...).StringsVar(&cfg.Backends)
 	app.Flag("select.comment-regex", "Regex over rule comments selecting rules for per-rule series; first group is the ID (repeatable).").StringsVar(&cfg.CommentRegex)
 	app.Flag("select.id-convention", "Select rules whose comment contains iptx:id=<name>.").Default("true").BoolVar(&cfg.IDConvention)
+	app.Flag("collect.user-chain-rules", "Export the iptables_rules gauge of user-defined chains. Disable with --no-collect.user-chain-rules (recommended on Kubernetes nodes).").Default("true").BoolVar(&cfg.UserChainRules)
 	app.Flag("limit.series", "Maximum non-health series per scrape; 0 disables the limit.").Default("5000").IntVar(&cfg.SeriesLimit)
 
 	binFlags := map[string]*string{}
-	for key, def := range config.DefaultBinaries {
+	binKeys := make([]string, 0, len(config.DefaultBinaries))
+	for key := range config.DefaultBinaries {
+		binKeys = append(binKeys, key)
+	}
+	sort.Strings(binKeys) // deterministic --help
+	for _, key := range binKeys {
+		def := config.DefaultBinaries[key]
 		name := "binary." + strings.Replace(key, "/", ".", 1)
 		binFlags[key] = app.Flag(name, "Save binary for "+key+".").Default(def).String()
 	}
@@ -66,6 +95,10 @@ func run() int {
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	logger := promslog.New(logCfg)
+	if err := validateMetricsPath(*metricsPath); err != nil {
+		logger.Error("invalid flag", "err", err)
+		return 1
+	}
 	for key, p := range binFlags {
 		cfg.Binaries[key] = *p
 	}
@@ -102,11 +135,14 @@ func run() int {
 	reg.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		collector.New(mgr, sel, cfg.SeriesLimit),
+		collector.New(mgr, sel, cfg.SeriesLimit, cfg.UserChainRules),
 	)
 
 	mux := http.NewServeMux()
-	mux.Handle(*metricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	mux.Handle(*metricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{
+		ErrorHandling: promhttp.ContinueOnError,
+		ErrorLog:      slogErrorLog{logger},
+	}))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.HandleFunc("/-/ready", func(w http.ResponseWriter, _ *http.Request) {
 		if !mgr.Ready() {

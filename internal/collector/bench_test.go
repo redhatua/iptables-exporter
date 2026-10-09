@@ -39,7 +39,7 @@ func bigSnapshot(b *testing.B, services, selected int) *snapshot.Snapshot {
 
 func benchCollect(b *testing.B, services, selected, limit int) {
 	sel, _ := selector.New(true, nil)
-	c := New(fakeSrc{bigSnapshot(b, services, selected)}, sel, limit)
+	c := New(fakeSrc{bigSnapshot(b, services, selected)}, sel, limit, true)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

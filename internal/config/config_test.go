@@ -29,6 +29,11 @@ func TestValidateRejects(t *testing.T) {
 		"negative limit":     func(c *Config) { c.SeriesLimit = -1 },
 		"zero max output":    func(c *Config) { c.MaxOutput = 0 },
 		"no families":        func(c *Config) { c.Families = nil },
+		"duplicate family":   func(c *Config) { c.Families = []string{"ipv4", "ipv4"} },
+		"duplicate backend":  func(c *Config) { c.Backends = []string{"nft", "legacy", "nft"} },
+		"max output too big": func(c *Config) { c.MaxOutput = 1<<40 + 1 },
+		"unknown binary key": func(c *Config) { c.Binaries["ipv4/ebtables"] = "x" },
+		"bare binary key":    func(c *Config) { c.Binaries["legacy"] = "x" },
 	}
 	for name, f := range mut {
 		t.Run(name, func(t *testing.T) {
@@ -38,6 +43,46 @@ func TestValidateRejects(t *testing.T) {
 				t.Fatal("expected error")
 			}
 		})
+	}
+}
+
+func TestValidateAcceptsMaxOutputLimit(t *testing.T) {
+	c := Default()
+	c.MaxOutput = 1 << 40
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateNamesTheDuplicate(t *testing.T) {
+	c := Default()
+	c.Backends = []string{"nft", "nft"}
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), `"nft"`) {
+		t.Fatalf("err = %v, want it to name nft", err)
+	}
+	c = Default()
+	c.Binaries["ipv9/legacy"] = "x"
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "ipv9/legacy") {
+		t.Fatalf("err = %v, want it to name ipv9/legacy", err)
+	}
+}
+
+func TestUserChainRulesDefaultAndYAML(t *testing.T) {
+	c := Default()
+	if !c.UserChainRules {
+		t.Fatal("user_chain_rules must default to true")
+	}
+	p := filepath.Join(t.TempDir(), "c.yaml")
+	os.WriteFile(p, []byte("user_chain_rules: false\n"), 0o644)
+	if err := c.LoadFile(p); err != nil {
+		t.Fatal(err)
+	}
+	if c.UserChainRules {
+		t.Fatal("user_chain_rules: false was not applied")
+	}
+	os.WriteFile(p, []byte("interval: 20s\n"), 0o644)
+	if err := c.LoadFile(p); err != nil || c.UserChainRules {
+		t.Fatalf("absent key must keep current value: err=%v rules=%v", err, c.UserChainRules)
 	}
 }
 

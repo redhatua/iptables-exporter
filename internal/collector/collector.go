@@ -51,11 +51,15 @@ type Collector struct {
 	src   Source
 	sel   *selector.Selector
 	limit int
+	// userChainRules enables the iptables_rules gauge of user-defined chains.
+	userChainRules bool
 }
 
-// New returns a collector. limit caps non-health series per scrape; 0 means unlimited.
-func New(src Source, sel *selector.Selector, limit int) *Collector {
-	return &Collector{src: src, sel: sel, limit: limit}
+// New returns a collector. limit caps non-health series per scrape; 0 means
+// unlimited. With userChainRules false the iptables_rules gauges of
+// user-defined chains are neither built nor emitted.
+func New(src Source, sel *selector.Selector, limit int, userChainRules bool) *Collector {
+	return &Collector{src: src, sel: sel, limit: limit, userChainRules: userChainRules}
 }
 
 // Describe implements prometheus.Collector.
@@ -99,6 +103,9 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 		for _, tb := range r.Tables {
 			for _, chn := range tb.Chains {
+				if !chn.Builtin() && !c.userChainRules {
+					continue
+				}
 				prio := 3
 				ms := []prometheus.Metric{
 					prometheus.MustNewConstMetric(descRules, prometheus.GaugeValue, float64(len(chn.Rules)), fam, be, tb.Name, chn.Name),

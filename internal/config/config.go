@@ -25,16 +25,23 @@ var DefaultBinaries = map[string]string{
 
 // Config is the full exporter configuration.
 type Config struct {
-	Interval     time.Duration     `yaml:"interval"`
-	Timeout      time.Duration     `yaml:"timeout"`
-	MaxOutput    int64             `yaml:"max_output_bytes"`
-	Families     []string          `yaml:"families"`
-	Backends     []string          `yaml:"backends"`
+	Interval  time.Duration `yaml:"interval"`
+	Timeout   time.Duration `yaml:"timeout"`
+	MaxOutput int64         `yaml:"max_output_bytes"`
+	Families  []string      `yaml:"families"`
+	Backends  []string      `yaml:"backends"`
+	// Binaries overrides save binaries by "<family>/<backend>" key; only the
+	// four keys of DefaultBinaries are valid.
 	Binaries     map[string]string `yaml:"binaries"`
 	CommentRegex []string          `yaml:"comment_regex"`
 	IDConvention bool              `yaml:"id_convention"`
 	SeriesLimit  int               `yaml:"series_limit"`
+	// UserChainRules enables the iptables_rules gauge of user-defined chains.
+	UserChainRules bool `yaml:"user_chain_rules"`
 }
+
+// maxOutputLimit bounds max_output_bytes so MaxOutput+1 cannot overflow.
+const maxOutputLimit = 1 << 40
 
 // Default returns the default configuration.
 func Default() Config {
@@ -51,6 +58,8 @@ func Default() Config {
 		Binaries:     bins,
 		IDConvention: true,
 		SeriesLimit:  5000,
+
+		UserChainRules: true,
 	}
 }
 
@@ -80,17 +89,34 @@ func (c *Config) Validate() error {
 		return errors.New("config: max_output_bytes must be positive")
 	case c.SeriesLimit < 0:
 		return errors.New("config: series_limit must be >= 0")
+	case c.MaxOutput > maxOutputLimit:
+		return fmt.Errorf("config: max_output_bytes must be at most %d", int64(maxOutputLimit))
 	case len(c.Families) == 0 || len(c.Backends) == 0:
 		return errors.New("config: at least one family and one backend are required")
 	}
+	seenF := map[string]bool{}
 	for _, f := range c.Families {
 		if f != "ipv4" && f != "ipv6" {
 			return fmt.Errorf("config: unknown family %q (want ipv4 or ipv6)", f)
 		}
+		if seenF[f] {
+			return fmt.Errorf("config: duplicate family %q", f)
+		}
+		seenF[f] = true
 	}
+	seenB := map[string]bool{}
 	for _, b := range c.Backends {
 		if b != "legacy" && b != "nft" {
 			return fmt.Errorf("config: unknown backend %q (want legacy or nft)", b)
+		}
+		if seenB[b] {
+			return fmt.Errorf("config: duplicate backend %q", b)
+		}
+		seenB[b] = true
+	}
+	for k := range c.Binaries {
+		if _, ok := DefaultBinaries[k]; !ok {
+			return fmt.Errorf("config: unknown binaries key %q (want one of ipv4/legacy, ipv6/legacy, ipv4/nft, ipv6/nft)", k)
 		}
 	}
 	for _, p := range c.CommentRegex {
