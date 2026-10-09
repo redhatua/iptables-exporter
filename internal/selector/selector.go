@@ -8,9 +8,12 @@ import (
 	"github.com/redhatua/iptables-exporter/internal/model"
 )
 
-var idConvention = regexp.MustCompile(`iptx:id=([A-Za-z0-9_.:-]{1,64})`)
+var idConvention = regexp.MustCompile(`iptx:id=([A-Za-z0-9_.:-]+)`)
 
-const maxIDLen = 128
+const (
+	maxConventionIDLen = 64
+	maxIDLen           = 128
+)
 
 // Selector picks rules by ID comment convention and/or comment regexes.
 type Selector struct {
@@ -47,7 +50,8 @@ func New(convention bool, patterns []string) (*Selector, error) {
 func (s *Selector) id(r model.Rule) (string, bool) {
 	for _, c := range r.Comments {
 		if s.convention {
-			if m := idConvention.FindStringSubmatch(c); m != nil {
+			// An over-long token is not a valid ID; never truncate it.
+			if m := idConvention.FindStringSubmatch(c); m != nil && len(m[1]) <= maxConventionIDLen {
 				return m[1], true
 			}
 		}

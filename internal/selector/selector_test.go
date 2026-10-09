@@ -89,3 +89,30 @@ func TestInvalidRegex(t *testing.T) {
 		t.Fatal("expected compile error")
 	}
 }
+
+func TestConventionIDOver64IsNotSelected(t *testing.T) {
+	s, _ := New(true, nil)
+	id := strings.Repeat("a", 65)
+	res := s.Select(parse(t, head+`[1:1] -A INPUT -m comment --comment "iptx:id=`+id+`" -j ACCEPT`+"\nCOMMIT\n"))
+	if len(res.Rules) != 0 {
+		t.Fatalf("res = %+v", res)
+	}
+}
+
+func TestConventionIDExactly64IsSelected(t *testing.T) {
+	s, _ := New(true, nil)
+	id := strings.Repeat("a", 64)
+	res := s.Select(parse(t, head+`[1:1] -A INPUT -m comment --comment "iptx:id=`+id+`" -j ACCEPT`+"\nCOMMIT\n"))
+	if len(res.Rules) != 1 || res.Rules[0].ID != id {
+		t.Fatalf("res = %+v", res)
+	}
+}
+
+func TestConventionSkipsCommentWithoutIDAndUsesNext(t *testing.T) {
+	s, _ := New(true, nil)
+	in := head + `[1:1] -A INPUT -m comment --comment "first" -m comment --comment "iptx:id=b" -j ACCEPT` + "\nCOMMIT\n"
+	res := s.Select(parse(t, in))
+	if len(res.Rules) != 1 || res.Rules[0].ID != "b" {
+		t.Fatalf("res = %+v", res)
+	}
+}
