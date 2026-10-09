@@ -212,7 +212,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Packets/s reaching the policy of each built-in chain.",
+         "description": "Counts only packets that fall through to the policy of a built-in chain; it is not total traffic. For the nat table these are connection-establishing packets, not connection throughput. Counters reset on iptables-restore or flush; rate() handles resets.",
          "fieldConfig": {
             "defaults": {
                "unit": "pps"
@@ -244,7 +244,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Packets/s dropped by a DROP policy. Chains whose policy is not DROP are excluded.",
+         "description": "Packets/s dropped by a DROP policy. Chains whose policy is not DROP are excluded. Counts only packets that reach a DROP policy; drops made by explicit DROP rules appear only if that rule is selected. A chain appears only while its policy is DROP.",
          "fieldConfig": {
             "defaults": {
                "unit": "pps"
@@ -276,7 +276,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Policy-chain byte rate",
+         "description": "Counts only packets that fall through to the policy of a built-in chain; it is not total traffic. For the nat table these are connection-establishing packets, not connection throughput. Counters reset on iptables-restore or flush; rate() handles resets.",
          "fieldConfig": {
             "defaults": {
                "unit": "Bps"
@@ -321,7 +321,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Only rules selected with iptx:id=<name> or --select.comment-regex appear here.",
+         "description": "Only rules selected with iptx:id=<name> or --select.comment-regex are shown; this is not a complete accept/drop total. An ACCEPT at one hook is not final delivery. Counters reset on iptables-restore or flush.",
          "fieldConfig": {
             "defaults": {
                "unit": "pps"
@@ -353,7 +353,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Rule throughput",
+         "description": "Only rules selected with iptx:id=<name> or --select.comment-regex are shown; this is not a complete accept/drop total. An ACCEPT at one hook is not final delivery. Counters reset on iptables-restore or flush.",
          "fieldConfig": {
             "defaults": {
                "unit": "Bps"
@@ -385,7 +385,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Instant values of the packets counter per selected rule.",
+         "description": "Only rules selected with iptx:id=<name> or --select.comment-regex are shown; this is not a complete accept/drop total. An ACCEPT at one hook is not final delivery. Counters reset on iptables-restore or flush.",
          "fieldConfig": {
             "defaults": {
                "unit": "short"
@@ -432,7 +432,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Rules per chain",
+         "description": "Current rule count per chain from the last successful snapshot; not a traffic measure.",
          "fieldConfig": {
             "defaults": {
                "unit": "short"
@@ -686,7 +686,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
          },
-         "description": "Joined by host (instance without port) because node_exporter and iptables-exporter use different ports. Empty if node_exporter or nf_conntrack is absent.",
+         "description": "Joined by host (instance without port) because node_exporter and iptables-exporter use different ports. Empty if node_exporter or nf_conntrack is absent. Ignores the instance variable: it shows every host that node_exporter reports. Hosts whose instance label has no port are not matched.",
          "fieldConfig": {
             "defaults": {
                "unit": "percentunit"
