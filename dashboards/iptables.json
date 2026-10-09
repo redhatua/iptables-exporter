@@ -1,0 +1,769 @@
+{
+   "description": "Policy counters, selected rules and health of iptables-exporter.",
+   "panels": [
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "panels": [ ],
+         "title": "Overview and coverage",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 1
+         },
+         "id": 2,
+         "options": {
+            "content": "**What these panels can and cannot tell you.**\nPolicy counters count packets that fell through to the policy of a built-in chain.\nPer-rule series exist only for rules you selected (comment `iptx:id=<name>` or `--select.comment-regex`),\nso this dashboard does not show complete accept/drop totals. An ACCEPT at one hook is not final delivery.\nNAT counters count connection-establishing packets, not connection throughput.\nCounters reset on `iptables-restore`, flush or rule re-creation; `rate()` handles resets.\nExporter health: when a target is down its counters are omitted (gaps), not frozen.\n",
+            "mode": "markdown"
+         },
+         "pluginVersion": "v13.0.0",
+         "title": "Coverage and semantics",
+         "type": "text"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Count of (family, backend) targets whose last collection succeeded.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 1
+         },
+         "id": 3,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum(iptables_up{job=~\"$job\", instance=~\"$instance\"})",
+               "legendFormat": ""
+            }
+         ],
+         "title": "Targets up",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Targets with a failed last collection.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 1
+         },
+         "id": 4,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "count(iptables_up{job=~\"$job\", instance=~\"$instance\"} == 0) or vector(0)",
+               "legendFormat": ""
+            }
+         ],
+         "title": "Targets down",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Age of the oldest successful snapshot.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 9
+         },
+         "id": 5,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max(time() - iptables_snapshot_timestamp_seconds{job=~\"$job\", instance=~\"$instance\"})",
+               "legendFormat": ""
+            }
+         ],
+         "title": "Max snapshot age",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Non-zero means the series limit truncated this scrape: raise --limit.series or narrow selection.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 9
+         },
+         "id": 6,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum(iptables_series_omitted{job=~\"$job\", instance=~\"$instance\"})",
+               "legendFormat": ""
+            }
+         ],
+         "title": "Series omitted",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Rules dropped because their iptx:id is not unique within a chain.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 9
+         },
+         "id": 7,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum(iptables_duplicate_rule_ids{job=~\"$job\", instance=~\"$instance\"})",
+               "legendFormat": ""
+            }
+         ],
+         "title": "Duplicate rule IDs",
+         "type": "stat"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 17
+         },
+         "id": 8,
+         "panels": [ ],
+         "title": "Policy chains",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Packets/s reaching the policy of each built-in chain.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 18
+         },
+         "id": 9,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum by (family, backend, table, chain) (rate(iptables_chain_policy_packets_total{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))",
+               "legendFormat": "{{family}}/{{backend}} {{table}}/{{chain}}"
+            }
+         ],
+         "title": "Policy-chain packet rate",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Packets/s dropped by a DROP policy. Chains whose policy is not DROP are excluded.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 18
+         },
+         "id": 10,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum by (instance, family, backend, table, chain) (rate(iptables_chain_policy_packets_total{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]) * on (instance, family, backend, table, chain) iptables_chain_policy_info{job=~\"$job\", instance=~\"$instance\", policy=\"DROP\"})",
+               "legendFormat": "{{instance}} {{family}}/{{backend}} {{table}}/{{chain}}"
+            }
+         ],
+         "title": "Policy DROP packet rate",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Policy-chain byte rate",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 18
+         },
+         "id": 11,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum by (family, backend, table, chain) (rate(iptables_chain_policy_bytes_total{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))",
+               "legendFormat": "{{family}}/{{backend}} {{table}}/{{chain}}"
+            }
+         ],
+         "title": "Policy-chain byte rate",
+         "type": "timeseries"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 26
+         },
+         "id": 12,
+         "panels": [ ],
+         "title": "Selected rules",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Only rules selected with iptx:id=<name> or --select.comment-regex appear here.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 27
+         },
+         "id": 13,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum by (rule_id, family, backend, table, chain) (rate(iptables_rule_packets_total{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))",
+               "legendFormat": "{{rule_id}} ({{family}}/{{backend}} {{table}}/{{chain}})"
+            }
+         ],
+         "title": "Rule hit rate",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Rule throughput",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 27
+         },
+         "id": 14,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum by (rule_id, family, backend, table, chain) (rate(iptables_rule_bytes_total{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))",
+               "legendFormat": "{{rule_id}} ({{family}}/{{backend}} {{table}}/{{chain}})"
+            }
+         ],
+         "title": "Rule throughput",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Instant values of the packets counter per selected rule.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 27
+         },
+         "id": 15,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "iptables_rule_packets_total{job=~\"$job\", instance=~\"$instance\"}",
+               "format": "table",
+               "instant": true,
+               "legendFormat": ""
+            }
+         ],
+         "title": "Selected rules, current counters",
+         "type": "table"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 35
+         },
+         "id": 16,
+         "panels": [ ],
+         "title": "Inventory",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Rules per chain",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 36
+         },
+         "id": 17,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "sum by (family, backend, table, chain) (iptables_rules{job=~\"$job\", instance=~\"$instance\"})",
+               "legendFormat": "{{family}}/{{backend}} {{table}}/{{chain}}"
+            }
+         ],
+         "title": "Rules per chain",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Userspace version per backend as reported by the save binary.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 36
+         },
+         "id": 18,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "iptables_backend_info{job=~\"$job\", instance=~\"$instance\"}",
+               "format": "table",
+               "instant": true,
+               "legendFormat": ""
+            }
+         ],
+         "title": "Backends and versions",
+         "type": "table"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Policies",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 36
+         },
+         "id": 19,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "iptables_chain_policy_info{job=~\"$job\", instance=~\"$instance\"}",
+               "format": "table",
+               "instant": true,
+               "legendFormat": ""
+            }
+         ],
+         "title": "Policies",
+         "type": "table"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 44
+         },
+         "id": 20,
+         "panels": [ ],
+         "title": "Exporter health",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Target up",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 45
+         },
+         "id": 21,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "iptables_up{job=~\"$job\", instance=~\"$instance\"}",
+               "legendFormat": "{{instance}} {{family}}/{{backend}}"
+            }
+         ],
+         "title": "Target up",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Time since the last successful collection. Grows while a target is failing.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 45
+         },
+         "id": 22,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "time() - iptables_snapshot_timestamp_seconds{job=~\"$job\", instance=~\"$instance\"}",
+               "legendFormat": "{{instance}} {{family}}/{{backend}}"
+            }
+         ],
+         "title": "Snapshot age",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Duration of the last collection attempt; large values signal huge rulesets or xtables lock contention.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 45
+         },
+         "id": 23,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "iptables_scrape_duration_seconds{job=~\"$job\", instance=~\"$instance\"}",
+               "legendFormat": "{{instance}} {{family}}/{{backend}}"
+            }
+         ],
+         "title": "Collection duration",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Series omitted by limit",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 53
+         },
+         "id": 24,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "iptables_series_omitted{job=~\"$job\", instance=~\"$instance\"}",
+               "legendFormat": "{{instance}}"
+            }
+         ],
+         "title": "Series omitted by limit",
+         "type": "timeseries"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 61
+         },
+         "id": 25,
+         "panels": [ ],
+         "title": "Conntrack (optional, requires node_exporter)",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+         },
+         "description": "Joined by host (instance without port) because node_exporter and iptables-exporter use different ports. Empty if node_exporter or nf_conntrack is absent.",
+         "fieldConfig": {
+            "defaults": {
+               "unit": "percentunit"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 62
+         },
+         "id": 26,
+         "pluginVersion": "v13.0.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (node) (label_replace(node_nf_conntrack_entries, \"node\", \"$1\", \"instance\", \"(.+):[0-9]+\")) / max by (node) (label_replace(node_nf_conntrack_entries_limit, \"node\", \"$1\", \"instance\", \"(.+):[0-9]+\"))",
+               "legendFormat": "{{node}}"
+            }
+         ],
+         "title": "Conntrack table usage",
+         "type": "timeseries"
+      }
+   ],
+   "refresh": "30s",
+   "schemaVersion": 39,
+   "tags": [
+      "iptables",
+      "netfilter",
+      "firewall"
+   ],
+   "templating": {
+      "list": [
+         {
+            "label": "Data source",
+            "name": "datasource",
+            "query": "prometheus",
+            "type": "datasource"
+         },
+         {
+            "allValue": ".+",
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${datasource}"
+            },
+            "includeAll": true,
+            "label": "Job",
+            "multi": true,
+            "name": "job",
+            "query": "label_values(iptables_up, job)",
+            "refresh": 2,
+            "type": "query"
+         },
+         {
+            "allValue": ".+",
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${datasource}"
+            },
+            "includeAll": true,
+            "label": "Instance",
+            "multi": true,
+            "name": "instance",
+            "query": "label_values(iptables_up{job=~\"$job\"}, instance)",
+            "refresh": 2,
+            "type": "query"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-6h",
+      "to": "now"
+   },
+   "timezone": "utc",
+   "title": "iptables exporter",
+   "uid": "iptables-exporter"
+}
