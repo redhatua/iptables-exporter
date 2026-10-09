@@ -6,7 +6,19 @@ on:
 permissions: {}
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: {go-version-file: go.mod}
+      - run: make lint test
+
   release:
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: write     # create the GitHub release
@@ -26,6 +38,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   image:
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -47,6 +60,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           {
             echo "version=${version}"
+            echo "revision=${GITHUB_SHA::7}"
             echo "tags<<EOF"
             echo "ghcr.io/redhatua/iptables-exporter:${version}"
             # only stable releases (no prerelease suffix) move latest
@@ -64,6 +78,6 @@ jobs:
           sbom: true
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
-            REVISION=${{ github.sha }}
+            REVISION=${{ steps.meta.outputs.revision }}
           tags: ${{ steps.meta.outputs.tags }}
       - run: cosign sign --yes ghcr.io/redhatua/iptables-exporter@${{ steps.build.outputs.digest }}
